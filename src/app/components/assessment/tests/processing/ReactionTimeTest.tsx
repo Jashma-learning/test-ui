@@ -97,6 +97,16 @@ export function ReactionTimeTest({ difficulty, onComplete }: Props) {
     }
   }, [phase, difficulty]);
 
+  // Add new useEffect for auto-starting next question
+  useEffect(() => {
+    if (phase === 'waiting' && attempts > 0 && attempts < maxAttempts) {
+      const timer = setTimeout(() => {
+        setPhase('ready');
+      }, 1500); // Show result for 1.5 seconds before next question
+      return () => clearTimeout(timer);
+    }
+  }, [phase, attempts, maxAttempts]);
+
   const handleStart = () => {
     setPhase('ready');
     setCurrentReactionTime(null);
@@ -110,28 +120,32 @@ export function ReactionTimeTest({ difficulty, onComplete }: Props) {
       const isCorrect = stimulus.isTarget;
       
       setCurrentReactionTime(timeTaken);
-      setPhase('waiting');
 
       if (isCorrect) {
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
         setReactionTimes(prev => [...prev, timeTaken]);
-        setAttempts(prev => prev + 1);
 
-        if (attempts + 1 >= maxAttempts) {
-          const averageTime = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+        if (newAttempts >= maxAttempts) {
+          const newReactionTimes = [...reactionTimes, timeTaken];
+          const averageTime = newReactionTimes.reduce((a, b) => a + b, 0) / newReactionTimes.length;
           onComplete({
-            score: Math.max(0, 100 - (averageTime / 10)), // Score decreases as average time increases
+            score: Math.max(0, 100 - (averageTime / 10)),
             metrics: {
               accuracy: 1,
               speed: averageTime / 1000,
-              consistency: calculateConsistency(reactionTimes)
+              consistency: calculateConsistency(newReactionTimes)
             },
-            details: { reactionTimes }
+            details: { reactionTimes: newReactionTimes }
           });
           setPhase('results');
+        } else {
+          setPhase('waiting');
         }
       } else {
         // Penalty for incorrect clicks
         setReactionTimes(prev => [...prev, timeTaken + 1000]);
+        setPhase('waiting');
       }
     }
   };
@@ -147,7 +161,7 @@ export function ReactionTimeTest({ difficulty, onComplete }: Props) {
     <div className="min-h-[600px] flex flex-col items-center justify-center">
       <div className="text-center text-white mb-8">
         <h3 className="text-2xl font-bold">
-          {phase === 'waiting' ? 'Get Ready!' : 
+          {phase === 'waiting' ? attempts === 0 ? 'Get Ready!' : 'Good! Next pattern coming...' : 
            phase === 'ready' ? 'Watch for the Target...' :
            phase === 'react' ? 'Find and Click the Target!' :
            'Results'}
@@ -162,13 +176,19 @@ export function ReactionTimeTest({ difficulty, onComplete }: Props) {
         )}
       </div>
 
-      {phase === 'waiting' && (
+      {phase === 'waiting' && attempts === 0 && (
         <button
           onClick={handleStart}
           className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
           Start Test
         </button>
+      )}
+
+      {phase === 'waiting' && attempts > 0 && attempts < maxAttempts && (
+        <div className="text-gray-400">
+          Next pattern in a moment...
+        </div>
       )}
 
       {(phase === 'ready' || phase === 'react') && (

@@ -104,6 +104,7 @@ export interface TestResult {
     accuracy: number;
     speed: number;
     consistency: number;
+    combo: number;
   };
   details: any;
 }

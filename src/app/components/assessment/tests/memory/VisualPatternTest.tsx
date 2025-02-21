@@ -57,38 +57,43 @@ const generateQuestions = (difficulty: number): Question[] => {
   return questions;
 };
 
-const calculateScore = (answers: boolean[][]): number => {
-  // Implement scoring logic
+const calculateScore = (userAnswers: boolean[][]): number => {
   return 75; // Placeholder
 };
 
-const calculateAccuracy = (answers: boolean[][]): number => {
-  // Implement accuracy calculation
+const calculateAccuracy = (userAnswers: boolean[][]): number => {
   return 0.75; // Placeholder
 };
 
 const calculateSpeed = (totalTime: number): number => {
-  // Implement speed calculation
-  return totalTime / 1000; // Convert to seconds
+  return totalTime / 1000;
 };
 
-const calculateConsistency = (answers: boolean[][]): number => {
-  // Implement consistency calculation
+const calculateConsistency = (userAnswers: boolean[][]): number => {
   return 0.8; // Placeholder
 };
 
 export function VisualPatternTest({ difficulty, onComplete }: Props) {
-  const [phase, setPhase] = useState<'display' | 'answer'>('display');
+  const [phase, setPhase] = useState<'initial' | 'display' | 'answer'>('initial');
   const [displayIndex, setDisplayIndex] = useState(0);
   const [answerIndex, setAnswerIndex] = useState(0);
   const [answers, setAnswers] = useState<boolean[][]>([]);
-  const [startTime] = useState(Date.now());
-  const [displayTime] = useState(2000); // 2 seconds per pattern
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [displayTime, setDisplayTime] = useState(2000);
 
-  const questions: Question[] = generateQuestions(difficulty);
-
+  // Initialize the test
   useEffect(() => {
-    if (phase === 'display' && displayIndex < questions.length) {
+    if (phase === 'initial') {
+      setQuestions(generateQuestions(difficulty));
+      setStartTime(Date.now());
+      setPhase('display');
+    }
+  }, [phase, difficulty]);
+
+  // Handle display phase timing
+  useEffect(() => {
+    if (phase === 'display' && questions.length > 0) {
       const timer = setTimeout(() => {
         if (displayIndex === questions.length - 1) {
           setPhase('answer');
@@ -101,17 +106,18 @@ export function VisualPatternTest({ difficulty, onComplete }: Props) {
     }
   }, [phase, displayIndex, questions.length, displayTime]);
 
-  const handleAnswer = (answer: boolean[][]) => {
-    setAnswers(prev => [...prev, ...answer]);
+  const handleAnswer = (answer: boolean[][]): void => {
+    setAnswers(prev => [...prev, ...answer.map(row => [...row])]);
     
     if (answerIndex < questions.length - 1) {
       setAnswerIndex(prev => prev + 1);
     } else {
+      const endTime = Date.now();
       const result: TestResult = {
         score: calculateScore(answers),
         metrics: {
           accuracy: calculateAccuracy(answers),
-          speed: calculateSpeed(Date.now() - startTime),
+          speed: calculateSpeed(endTime - (startTime || endTime)),
           consistency: calculateConsistency(answers)
         },
         details: { answers }
@@ -120,7 +126,18 @@ export function VisualPatternTest({ difficulty, onComplete }: Props) {
     }
   };
 
-  if (phase === 'display') {
+  // Show loading state during initialization
+  if (phase === 'initial' || questions.length === 0) {
+    return (
+      <div className="min-h-[600px] flex flex-col items-center justify-center">
+        <div className="text-center text-white">
+          <h3 className="text-2xl font-bold">Preparing Test...</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'display' && questions[displayIndex]) {
     return (
       <div className="min-h-[600px] flex flex-col items-center justify-center">
         <div className="text-center text-white mb-8">
@@ -134,8 +151,10 @@ export function VisualPatternTest({ difficulty, onComplete }: Props) {
               <div key={i} className="flex gap-2">
                 {row.map((cell, j) => (
                   <div
-                    key={j}
-                    className={`w-20 h-20 rounded-lg transition-colors duration-200 ${cell ? 'bg-blue-500 shadow-inner' : 'bg-gray-600'}`}
+                    key={`${i}-${j}`}
+                    className={`w-20 h-20 rounded-lg transition-colors duration-200 ${
+                      cell ? 'bg-blue-500 shadow-inner' : 'bg-gray-600'
+                    }`}
                   />
                 ))}
               </div>
@@ -159,10 +178,25 @@ export function VisualPatternTest({ difficulty, onComplete }: Props) {
       </div>
 
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg">
-        <PatternInput
-          size={questions[answerIndex].pattern.length}
-          onSubmit={handleAnswer}
-        />
+        <div className="grid gap-2">
+          {questions[answerIndex].pattern.map((row, i) => (
+            <div key={i} className="flex gap-2">
+              {row.map((_, j) => (
+                <button
+                  key={`${i}-${j}`}
+                  onClick={() => {
+                    const newPattern: boolean[][] = Array(row.length).fill(0).map(() => 
+                      Array(row.length).fill(false)
+                    );
+                    newPattern[i][j] = true;
+                    handleAnswer(newPattern);
+                  }}
+                  className="w-20 h-20 rounded-lg transition-colors duration-200 bg-gray-600 hover:bg-gray-500"
+                />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

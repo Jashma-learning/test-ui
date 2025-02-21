@@ -39,7 +39,8 @@ const QuestionDisplay = ({ questions, difficulty, onComplete }: Props) => {
       metrics: {
         accuracy: correctAnswers.length / questions.length,
         speed: (endTime - startTime) / questions.length,
-        consistency: calculateConsistency()
+        consistency: calculateConsistency(),
+        combo: 0
       },
       details: {
         answers,
